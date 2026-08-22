@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
   type Node,
   type Edge,
   type NodeMouseHandler,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -77,29 +78,38 @@ export function ClaimGraph({
   graph,
   claims,
   onSelect,
+  highlightClaimId,
 }: {
   graph: ClaimGraphData;
   claims: Claim[];
   onSelect: (claim: Claim) => void;
+  highlightClaimId?: string | null;
 }) {
   const [hovered, setHovered] = useState<{ node: ClaimGraphNode; x: number; y: number } | null>(
     null
   );
   const [clicked, setClicked] = useState<ClaimGraphNode | null>(null);
+  const rfInstance = useRef<ReactFlowInstance | null>(null);
   const claimById = useMemo(() => new Map(claims.map((c) => [c.id, c])), [claims]);
   const clickedClaim = clicked?.claimId ? claimById.get(clicked.claimId) : undefined;
 
-  const { nodes, edges, nodeById } = useMemo(() => {
+  const { nodes, edges, nodeById, positionById } = useMemo(() => {
     const positions = computeLayout(graph.nodes, graph.edges);
     const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
 
     const rfNodes: Node[] = graph.nodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: 0, y: 0 };
       const size = nodeSize(n);
+      const isHighlighted = !!highlightClaimId && n.claimId === highlightClaimId;
       return {
         id: n.id,
         type: "dot",
-        data: { color: nodeColor(n), size, glow: n.kind === "instruction" || !!n.status },
+        data: {
+          color: nodeColor(n),
+          size: isHighlighted ? size + 6 : size,
+          glow: n.kind === "instruction" || !!n.status,
+          pulse: isHighlighted,
+        },
         position: pos,
         draggable: false,
       };
@@ -117,8 +127,18 @@ export function ClaimGraph({
       },
     }));
 
-    return { nodes: rfNodes, edges: rfEdges, nodeById };
-  }, [graph]);
+    return { nodes: rfNodes, edges: rfEdges, nodeById, positionById: positions };
+  }, [graph, highlightClaimId]);
+
+  // Pan/zoom to whatever just got flagged live, so the presenter can point straight at it.
+  useEffect(() => {
+    if (!highlightClaimId || !rfInstance.current) return;
+    const node = graph.nodes.find((n) => n.claimId === highlightClaimId);
+    if (!node) return;
+    const pos = positionById.get(node.id);
+    if (!pos) return;
+    rfInstance.current.setCenter(pos.x, pos.y, { zoom: 1.4, duration: 600 });
+  }, [highlightClaimId, graph.nodes, positionById]);
 
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
     (evt, node) => {
@@ -160,6 +180,9 @@ export function ClaimGraph({
         onNodeMouseLeave={onNodeMouseLeave}
         onNodeClick={onNodeClick}
         onPaneClick={() => setClicked(null)}
+        onInit={(instance) => {
+          rfInstance.current = instance;
+        }}
       >
         <Background color="#27272a" gap={22} size={1} />
       </ReactFlow>
