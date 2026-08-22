@@ -345,7 +345,7 @@ export async function* runPipeline(
     detail: { resolved: tier3Resolved, total: tier3Queue.length },
   };
 
-  const graph = buildGraph(claims);
+  const graph = buildGraph(turns, claims);
   yield {
     stage: "graph",
     status: "done",
@@ -379,53 +379,91 @@ function computeScore(claims: Claim[]): number {
   return Math.round((good / claims.length) * 100);
 }
 
-function buildGraph(claims: Claim[]): ClaimGraph {
+/**
+ * Builds the whole-session activity graph, not just an isolated triplet per claim:
+ * every user instruction and every tool call becomes a node, chained chronologically
+ * and grouped under the instruction that was active when it ran. Tool calls that
+ * produced a diff hunk are colored by claim status; everything else is a neutral
+ * "action" node — so the graph's density reflects the real size of the session, and
+ * a contradicted claim reads as one flagged node in a much larger, real structure.
+ */
+function buildGraph(turns: TranscriptTurn[], claims: Claim[]): ClaimGraph {
   const nodes: ClaimGraphNode[] = [];
   const edges: ClaimGraphEdge[] = [];
-  const seenInstructions = new Map<string, string>();
+  const claimByToolCallId = new Map<string, Claim>();
+  for (const c of claims) {
+    if (c.evidenceToolCallId) claimByToolCallId.set(c.evidenceToolCallId, c);
+  }
+  // Also index by producing tool call so file-mutation calls pick up their claim.
+  const claimById = new Map(claims.map((c) => [c.id, c]));
 
-  for (const claim of claims) {
-    const hunkNodeId = `hunk:${claim.id}`;
-    nodes.push({
-      id: hunkNodeId,
-      kind: "hunk",
-      label: `${basenameOf(claim.file)}:${claim.startLine}`,
-      claimId: claim.id,
-      status: claim.status,
-    });
+  let currentInstructionId: string | null = null;
+  let prevActionId: string | null = null;
 
-    const instrKey = claim.instructionTurnId ?? claim.instruction.slice(0, 40);
-    let instrNodeId = seenInstructions.get(instrKey);
-    if (!instrNodeId) {
-      instrNodeId = `instr:${instrKey}`;
-      seenInstructions.set(instrKey, instrNodeId);
+  for (const turn of turns) {
+    if (turn.role === "user" && turn.instructionText) {
+      const instrId = `instr:${turn.uuid}`;
       nodes.push({
-        id: instrNodeId,
+        id: instrId,
         kind: "instruction",
-        label: claim.instruction.slice(0, 60),
+        label: turn.instructionText.slice(0, 60),
       });
+      currentInstructionId = instrId;
+      prevActionId = null;
+      continue;
     }
-    edges.push({
-      id: `${instrNodeId}->${hunkNodeId}`,
-      source: instrNodeId,
-      target: hunkNodeId,
-      kind: "produced-by",
-    });
+    for (const tc of turn.toolCalls) {
+      const actionId = `action:${tc.id}`;
+      const inputPath = String(tc.input?.file_path ?? "");
+      const matchedClaim =
+        [...claimById.values()].find((c) => c.evidenceToolCallId === tc.id) ??
+        (["Edit", "Write", "NotebookEdit"].includes(tc.name) && inputPath
+          ? claims.find((c) => inputPath.endsWith(c.file) || c.file.endsWith(inputPath))
+          : undefined);
 
-    if (claim.evidence) {
-      const evNodeId = `ev:${claim.id}`;
       nodes.push({
-        id: evNodeId,
-        kind: "evidence",
-        label: claim.evidence.slice(0, 60),
-        status: claim.status,
+        id: actionId,
+        kind: "action",
+        label: `${tc.name}${matchedClaim ? ` (${basenameOf(matchedClaim.file)}:${matchedClaim.startLine})` : ""}`,
+        claimId: matchedClaim?.id,
+        status: matchedClaim?.status,
       });
-      edges.push({
-        id: `${hunkNodeId}->${evNodeId}`,
-        source: hunkNodeId,
-        target: evNodeId,
-        kind: claim.status === "contradicted" ? "contradicts" : "verified-by",
-      });
+
+      if (currentInstructionId) {
+        edges.push({
+          id: `${currentInstructionId}->${actionId}`,
+          source: currentInstructionId,
+          target: actionId,
+          kind: "produced-by",
+        });
+      }
+      if (prevActionId) {
+        edges.push({
+          id: `${prevActionId}=>${actionId}`,
+          source: prevActionId,
+          target: actionId,
+          kind: "sequence",
+        });
+      }
+      prevActionId = actionId;
+
+      if (matchedClaim?.evidence) {
+        const evNodeId = `ev:${matchedClaim.id}`;
+        if (!nodes.some((n) => n.id === evNodeId)) {
+          nodes.push({
+            id: evNodeId,
+            kind: "evidence",
+            label: matchedClaim.evidence.slice(0, 60),
+            status: matchedClaim.status,
+          });
+          edges.push({
+            id: `${actionId}->${evNodeId}`,
+            source: actionId,
+            target: evNodeId,
+            kind: matchedClaim.status === "contradicted" ? "contradicts" : "verified-by",
+          });
+        }
+      }
     }
   }
 

@@ -58,7 +58,7 @@ export interface Claim {
 
 export interface ClaimGraphNode {
   id: string;
-  kind: "instruction" | "hunk" | "evidence";
+  kind: "instruction" | "hunk" | "evidence" | "action";
   label: string;
   claimId?: string;
   status?: ClaimStatus;
@@ -68,7 +68,7 @@ export interface ClaimGraphEdge {
   id: string;
   source: string;
   target: string;
-  kind: "produced-by" | "asserts" | "verified-by" | "contradicts";
+  kind: "produced-by" | "asserts" | "verified-by" | "contradicts" | "sequence";
 }
 
 export interface ClaimGraph {
