@@ -97,12 +97,11 @@ function tier1Check(hunk: DiffHunk, turns: TranscriptTurn[]): Tier1Result {
   if (producingCall) hunk.producingToolCallId = producingCall.id;
 
   const bash = bashCalls(turns);
-  const TEST_CMD_RE = /\b(npm|npx|yarn|pnpm)\s+(run\s+)?test\b|\b(jest|vitest|pytest|go test|tsc\s+--noEmit)\b/;
-  const base = basenameOf(hunk.file).toLowerCase();
-  const relevant = bash.filter((tc) => {
-    const cmd = String(tc.input?.command ?? "").toLowerCase();
-    return TEST_CMD_RE.test(cmd) || (base.length > 4 && new RegExp(`\\b${base}\\b`).test(cmd));
-  });
+  // Must actually BE a test/verification command — not just any command that happens
+  // to mention the filename (a real bug: `git diff foo.ts` was matching as "test evidence"
+  // for foo.ts because it contained the filename as a substring).
+  const TEST_CMD_RE = /\b(npm|npx|yarn|pnpm)\s+(run\s+)?(test|lint|build|typecheck)\b|\b(jest|vitest|pytest|go test|tsc\s+--noEmit|eslint)\b/;
+  const relevant = bash.filter((tc) => TEST_CMD_RE.test(String(tc.input?.command ?? "").toLowerCase()));
   if (relevant.length === 0) return { status: null, evidence: null };
 
   const last = relevant[relevant.length - 1];
@@ -273,9 +272,12 @@ export async function* runPipeline(
     const t1 = tier1Check(hunk, turns);
     const t2 = tier2Check(hunk, turns);
 
-    if (t1.status !== null) {
-      // Execution evidence exists (a real test ran) — that's a hard fact regardless of
-      // instruction latitude, so this resolves at tier 1 without needing an LLM opinion.
+    // A real execution failure is worth surfacing on its own — a broken test/build is
+    // a hard fact regardless of scope. But execution SUCCESS does not imply the change
+    // was actually asked for; "it compiles" and "it was in scope" are independent facts,
+    // so a passing build only short-circuits tier 3 when it's ALSO traceable to an
+    // instruction or the agent's own stated plan.
+    if (t1.status === "contradicted") {
       tier1Resolved += 1;
       claims.push({
         id: claimId(hunk),
@@ -284,10 +286,32 @@ export async function* runPipeline(
         endLine: hunk.endLine,
         instruction: t2.instruction,
         instructionTurnId: t2.instructionTurnId,
-        assertion: t1.status === "verified" ? "Change was tested and passed." : "Change was tested and failed.",
+        assertion: "Change was tested and failed.",
         evidence: t1.evidence,
         evidenceToolCallId: t1.evidenceToolCallId,
-        status: t1.status,
+        status: "contradicted",
+        tier: "deterministic",
+        undisclosedScope: !t2.traceable && !t2.planTraceable,
+        riskTier: "low",
+        diff: hunk.content,
+        commitLabel: hunk.commitMessage,
+      });
+      continue;
+    }
+
+    if (t1.status === "verified" && (t2.traceable || t2.planTraceable)) {
+      tier1Resolved += 1;
+      claims.push({
+        id: claimId(hunk),
+        file: hunk.file,
+        startLine: hunk.startLine,
+        endLine: hunk.endLine,
+        instruction: t2.instruction,
+        instructionTurnId: t2.instructionTurnId,
+        assertion: "Change was tested and passed, and matches an instruction/plan.",
+        evidence: t1.evidence,
+        evidenceToolCallId: t1.evidenceToolCallId,
+        status: "verified",
         tier: "deterministic",
         undisclosedScope: false,
         riskTier: "low",
@@ -297,7 +321,7 @@ export async function* runPipeline(
       continue;
     }
 
-    if (t2.traceable || t2.planTraceable) {
+    if (t1.status === null && (t2.traceable || t2.planTraceable)) {
       // A literal match (instruction or the agent's own plan text names this file/symbol)
       // is high-confidence evidence FOR coverage — resolves cheaply, no LLM needed.
       tier2Resolved += 1;
