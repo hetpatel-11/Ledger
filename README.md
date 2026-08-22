@@ -1,37 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Instruction Fidelity
 
-## Getting Started
+Code review checks if the code is good. It doesn't check if the agent
+actually did what you asked. This does.
 
-First, run the development server:
+Built for AGI House SF's AI for Trust and Safety hackathon challenge
+("Catch what the loop misses"): agents oversell what they did, and drift
+mid-session from what they said they'd do — and no review tool checks either,
+because they only ever see the final diff, never the transcript that produced it.
+
+## What it checks
+
+Three comparisons, all against the full session transcript (not just the diff):
+
+1. **Instruction → Plan** — did the agent's stated intent honor the latitude of what was asked.
+2. **Plan → Action** — did the agent's actual edit match what it said, moments earlier, it would do.
+3. **Claim → Execution** — did the agent's final summary match what its own recorded tool calls actually show happened.
+
+Verification is deterministic wherever the transcript has a checkable fact
+(a real test exit code, a literal file/symbol match) and falls back to a
+narrowly-scoped LLM judgment only for the genuinely ambiguous remainder —
+which is labeled as a judgment call in the UI, not presented as a fact.
+
+## Running it
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. Click **Analyze** to run against the current
+repo's git diff and the most recent Claude Code transcript for this project,
+or push a session live from Claude via the MCP server below.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Set `ANTHROPIC_API_KEY` in `.env.local` for the tier-3 LLM judgment calls and
+the "Suggest Fix" action to work.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## MCP server
 
-## Learn More
+`.mcp.json` registers an `instruction-fidelity` MCP server (`mcp/server.ts`,
+run via `tsx`) exposing three tools to Claude:
 
-To learn more about Next.js, take a look at the following resources:
+- `push_transcript` — analyzes the current session + repo and pushes the result live to the dashboard.
+- `explain_claim` — grounded, cited explanation of why a specific claim is verified/contradicted/unchecked.
+- `list_unverified` — the gap list an approver should read before signing off.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Restart Claude Code (or reconnect MCP servers) after cloning so it picks up `.mcp.json`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Live mode
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
+`.claude/settings.json` registers a `PostToolUse` hook that POSTs every
+Edit/Write/NotebookEdit call to `/api/live-ingest`, so the dashboard updates
+while an agent is still working — not just after the session ends.

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://localhost:3000/api/live-ingest -H 'Content-Type: application/json' -d @- > /dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

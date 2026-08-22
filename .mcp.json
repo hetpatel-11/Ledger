@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "instruction-fidelity": {
+      "command": "npx",
+      "args": ["tsx", "mcp/server.ts"],
+      "env": {
+        "INSTRUCTION_FIDELITY_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
