@@ -30,6 +30,49 @@ function basenameOf(file: string): string {
   return file.split("/").pop() ?? file;
 }
 
+/**
+ * A turn that's just an image paste (e.g. "[Image: source: ...]") carries no
+ * checkable text — using it as "the instruction" makes every judgment meaningless.
+ * Strip image markers and require enough real text left to actually judge against.
+ */
+function isSubstantiveInstruction(text: string): boolean {
+  const withoutImageMarkers = text.replace(/\[Image:[^\]]*\]/g, "").trim();
+  return withoutImageMarkers.length >= 15;
+}
+
+/** A human-readable, specific description of a tool call — not just its bare name. */
+function describeToolCall(tc: { name: string; input: Record<string, unknown> }): string {
+  const input = tc.input ?? {};
+  switch (tc.name) {
+    case "Bash":
+      return (input.description as string) || truncate(String(input.command ?? ""), 70);
+    case "Edit":
+    case "Write":
+    case "NotebookEdit":
+      return `${tc.name}: ${basenameOf(String(input.file_path ?? "unknown file"))}`;
+    case "Read":
+      return `Read: ${basenameOf(String(input.file_path ?? "unknown file"))}`;
+    case "Grep":
+      return `Grep: "${truncate(String(input.pattern ?? ""), 40)}"`;
+    case "WebSearch":
+      return `WebSearch: "${truncate(String(input.query ?? ""), 50)}"`;
+    case "WebFetch":
+      return `WebFetch: ${truncate(String(input.url ?? ""), 50)}`;
+    case "ToolSearch":
+      return `ToolSearch: "${truncate(String(input.query ?? ""), 50)}"`;
+    case "TaskCreate":
+      return `TaskCreate: ${truncate(String(input.subject ?? ""), 50)}`;
+    case "TaskUpdate":
+      return `TaskUpdate: ${truncate(String(input.subject ?? input.taskId ?? ""), 50)}`;
+    default:
+      return `${tc.name}: ${truncate(JSON.stringify(input), 60)}`;
+  }
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
 interface Tier1Result {
   status: "verified" | "contradicted" | null; // null = inconclusive, fall through
   evidence: string | null;
@@ -88,7 +131,9 @@ function tier2Check(
 } {
   const hunkIdentifiers = extractIdentifiers(hunk.content);
   const base = basenameOf(hunk.file).toLowerCase();
-  const userTurns = turns.filter((t) => t.role === "user" && t.instructionText);
+  const userTurns = turns.filter(
+    (t) => t.role === "user" && t.instructionText && isSubstantiveInstruction(t.instructionText)
+  );
 
   let instructionMatch: { text: string; turnId: string } | null = null;
   for (const t of userTurns) {
@@ -424,7 +469,7 @@ function buildGraph(turns: TranscriptTurn[], claims: Claim[]): ClaimGraph {
       nodes.push({
         id: actionId,
         kind: "action",
-        label: `${tc.name}${matchedClaim ? ` (${basenameOf(matchedClaim.file)}:${matchedClaim.startLine})` : ""}`,
+        label: `${describeToolCall(tc)}${matchedClaim ? ` — claim: ${matchedClaim.assertion.slice(0, 60)}` : ""}`,
         claimId: matchedClaim?.id,
         status: matchedClaim?.status,
       });

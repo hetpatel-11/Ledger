@@ -21,11 +21,18 @@ export default function Home() {
   // Subscribe once for live updates (bootstrap push, hook-driven live-ingest, verify/fix mutations).
   useEffect(() => {
     const es = new EventSource("/api/stream");
-    es.onmessage = (e) => {
+    es.onmessage = async (e) => {
       const { type, data } = JSON.parse(e.data);
-      if (type === "result-updated") setResult(data);
+      if (type === "result-updated") {
+        setResult(data);
+        return;
+      }
       if (type === "claim-updated" || type === "live-claim") {
-        setResult((prev) => (prev ? { ...prev, score: data.score } : prev));
+        // The server-side store already has the full updated claims/graph — refetch
+        // it rather than trying to hand-patch partial state (score alone isn't enough;
+        // the graph and ledger need the new/changed node too).
+        const res = await fetch("/api/claims");
+        if (res.ok) setResult(await res.json());
       }
     };
     eventSourceRef.current = es;
@@ -136,12 +143,34 @@ export default function Home() {
       )}
 
       {result && (
-        <Tabs defaultValue="blame">
+        <Tabs defaultValue="graph">
           <TabsList className="bg-neutral-900 border border-neutral-800">
+            <TabsTrigger value="graph">Claim Graph</TabsTrigger>
             <TabsTrigger value="blame">Blame / Diff</TabsTrigger>
             <TabsTrigger value="ledger">Claim Ledger</TabsTrigger>
-            <TabsTrigger value="graph">Claim Graph</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="graph" className="mt-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <ClaimGraph graph={result.graph} claims={result.claims} onSelect={setSelected} />
+              </div>
+              <div>
+                {selected ? (
+                  <ClaimPanel
+                    claim={selected}
+                    onVerify={verifyClaim}
+                    onSuggestFix={suggestFix}
+                    onAcceptFix={acceptFix}
+                  />
+                ) : (
+                  <div className="border border-neutral-800 rounded-lg bg-neutral-950 p-6 text-neutral-600 font-mono text-sm">
+                    Click a colored node (an instruction's linked action or evidence) to inspect its claim and take action.
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="blame" className="mt-4">
             <div className="grid grid-cols-3 gap-4">
@@ -171,10 +200,6 @@ export default function Home() {
 
           <TabsContent value="ledger" className="mt-4">
             <ClaimLedger claims={result.claims} onSelect={setSelected} />
-          </TabsContent>
-
-          <TabsContent value="graph" className="mt-4">
-            <ClaimGraph graph={result.graph} />
           </TabsContent>
         </Tabs>
       )}
