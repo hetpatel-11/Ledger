@@ -9,16 +9,13 @@ import { Separator } from "@/components/ui/separator";
 
 export function ClaimPanel({
   claim,
-  onVerify,
   onSuggestFix,
   onAcceptFix,
 }: {
   claim: Claim;
-  onVerify: (claimId: string) => Promise<void>;
   onSuggestFix: (claimId: string) => Promise<string | null>;
   onAcceptFix: (claimId: string) => Promise<void>;
 }) {
-  const [verifying, setVerifying] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [suggestedPatch, setSuggestedPatch] = useState<string | null>(null);
 
@@ -58,21 +55,6 @@ export function ClaimPanel({
       </pre>
 
       <div className="flex gap-2 pt-2">
-        {claim.status === "unchecked" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-neutral-700"
-            disabled={verifying}
-            onClick={async () => {
-              setVerifying(true);
-              await onVerify(claim.id);
-              setVerifying(false);
-            }}
-          >
-            {verifying ? "Verifying..." : "Verify Now"}
-          </Button>
-        )}
         {claim.status === "contradicted" && !suggestedPatch && (
           <Button
             size="sm"

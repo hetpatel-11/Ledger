@@ -167,7 +167,6 @@ export default function Home() {
                 {selected ? (
                   <ClaimPanel
                     claim={selected}
-                    onVerify={verifyClaim}
                     onSuggestFix={suggestFix}
                     onAcceptFix={acceptFix}
                   />
@@ -183,7 +182,6 @@ export default function Home() {
           <TabsContent value="claims" className="mt-4">
             <ClaimLedger
               claims={result.claims}
-              onVerify={verifyClaim}
               onSuggestFix={suggestFix}
               onAcceptFix={acceptFix}
             />

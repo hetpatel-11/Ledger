@@ -29,12 +29,10 @@ const TIER_BADGE: Record<ClaimTier, { label: string; className: string }> = {
 
 export function ClaimLedger({
   claims,
-  onVerify,
   onSuggestFix,
   onAcceptFix,
 }: {
   claims: Claim[];
-  onVerify: (claimId: string) => Promise<void>;
   onSuggestFix: (claimId: string) => Promise<string | null>;
   onAcceptFix: (claimId: string) => Promise<void>;
 }) {
@@ -177,21 +175,6 @@ export function ClaimLedger({
                   )}
 
                   <div className="flex gap-2 pt-1">
-                    {c.status === "unchecked" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-neutral-700"
-                        disabled={busy === c.id}
-                        onClick={async () => {
-                          setBusy(c.id);
-                          await onVerify(c.id);
-                          setBusy(null);
-                        }}
-                      >
-                        {busy === c.id ? "Verifying..." : "Verify Now"}
-                      </Button>
-                    )}
                     {c.status === "contradicted" && !suggestedPatches[c.id] && (
                       <Button
                         size="sm"
