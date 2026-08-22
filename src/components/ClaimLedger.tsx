@@ -21,6 +21,12 @@ const SEVERITY: Record<Claim["status"], number> = {
   verified: 2,
 };
 
+const TIER_BADGE: Record<ClaimTier, { label: string; className: string }> = {
+  deterministic: { label: "⚙ no LLM · real exit code", className: "bg-neutral-800/60 text-neutral-400 border-neutral-700" },
+  structural: { label: "⚙ no LLM · literal match", className: "bg-neutral-800/60 text-neutral-400 border-neutral-700" },
+  llm: { label: "🤖 LLM call made", className: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
+};
+
 export function ClaimLedger({
   claims,
   onVerify,
@@ -105,6 +111,9 @@ export function ClaimLedger({
                 <Badge variant="outline" className={`${STATUS_BG[c.status]} shrink-0`}>
                   {STATUS_LABEL[c.status]}
                 </Badge>
+                <Badge variant="outline" className={`${TIER_BADGE[c.tier].className} shrink-0`}>
+                  {TIER_BADGE[c.tier].label}
+                </Badge>
                 <span className="text-neutral-500 shrink-0">{c.file}:{c.startLine}</span>
                 <span className="text-neutral-300 truncate flex-1">{c.assertion}</span>
                 {c.commitLabel && (
@@ -134,8 +143,11 @@ export function ClaimLedger({
                   </div>
 
                   <div>
-                    <div className="text-neutral-500 uppercase tracking-wide text-[10px] mb-1">
-                      How this was decided — tier: {c.tier}
+                    <div className="text-neutral-500 uppercase tracking-wide text-[10px] mb-1 flex items-center gap-2">
+                      How this was decided
+                      <Badge variant="outline" className={TIER_BADGE[c.tier].className}>
+                        {TIER_BADGE[c.tier].label}
+                      </Badge>
                     </div>
                     <div className="text-neutral-500 italic">{TIER_EXPLANATION[c.tier]}</div>
                   </div>
