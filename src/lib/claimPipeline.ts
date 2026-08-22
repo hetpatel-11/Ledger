@@ -12,10 +12,18 @@ import type {
 import { diffHunks } from "./gitTools";
 import { bashCalls, fileMutations, lastAssistantSummary } from "./parseTranscript";
 
-const IDENTIFIER_RE = /\b[a-zA-Z_][a-zA-Z0-9_]{3,}\b/g;
+const IDENTIFIER_RE = /\b[a-zA-Z_][a-zA-Z0-9_]{4,}\b/g;
+const STOPWORDS = new Set([
+  "which", "there", "these", "those", "would", "could", "should", "about",
+  "function", "return", "const", "export", "import", "default", "async",
+  "await", "value", "params", "props", "state", "index", "array", "object",
+  "string", "number", "boolean", "false", "true", "null", "undefined",
+  "instruction", "assistant", "message", "content", "please", "actually",
+]);
 
 function extractIdentifiers(text: string): Set<string> {
-  return new Set((text.match(IDENTIFIER_RE) ?? []).map((s) => s.toLowerCase()));
+  const raw = (text.match(IDENTIFIER_RE) ?? []).map((s) => s.toLowerCase());
+  return new Set(raw.filter((w) => !STOPWORDS.has(w)));
 }
 
 function basenameOf(file: string): string {
@@ -38,15 +46,11 @@ function tier1Check(hunk: DiffHunk, turns: TranscriptTurn[]): Tier1Result {
   if (producingCall) hunk.producingToolCallId = producingCall.id;
 
   const bash = bashCalls(turns);
+  const TEST_CMD_RE = /\b(npm|npx|yarn|pnpm)\s+(run\s+)?test\b|\b(jest|vitest|pytest|go test|tsc\s+--noEmit)\b/;
+  const base = basenameOf(hunk.file).toLowerCase();
   const relevant = bash.filter((tc) => {
     const cmd = String(tc.input?.command ?? "").toLowerCase();
-    return (
-      cmd.includes("test") ||
-      cmd.includes("jest") ||
-      cmd.includes("vitest") ||
-      cmd.includes("pytest") ||
-      cmd.includes(basenameOf(hunk.file).toLowerCase())
-    );
+    return TEST_CMD_RE.test(cmd) || (base.length > 4 && new RegExp(`\\b${base}\\b`).test(cmd));
   });
   if (relevant.length === 0) return { status: null, evidence: null };
 
