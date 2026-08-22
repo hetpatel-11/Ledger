@@ -36,6 +36,7 @@ export function ClaimLedger({
   const [suggestedPatches, setSuggestedPatches] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
+  const [showHow, setShowHow] = useState(false);
   const sorted = [...claims].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status]);
   const counts = {
     verified: claims.filter((c) => c.status === "verified").length,
@@ -45,6 +46,40 @@ export function ClaimLedger({
 
   return (
     <div className="space-y-4">
+      <div className="border border-neutral-800 rounded-lg bg-neutral-950 font-mono text-xs">
+        <button
+          onClick={() => setShowHow((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-neutral-400 hover:bg-neutral-900/60"
+        >
+          <span>How is this being detected?</span>
+          <span>{showHow ? "▲" : "▼"}</span>
+        </button>
+        {showHow && (
+          <div className="px-4 pb-4 space-y-3 border-t border-neutral-900 pt-3 text-neutral-400">
+            <p>
+              Every claim below comes from one diff hunk, checked against three things
+              pulled from the real session transcript — not just the code:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-neutral-500">
+              <li><span className="text-neutral-300">Instruction → Plan</span> — did the agent&apos;s stated intent honor what was actually asked, given how much latitude the instruction granted.</li>
+              <li><span className="text-neutral-300">Plan → Action</span> — did the agent&apos;s actual edit match what it said, moments earlier, it would do.</li>
+              <li><span className="text-neutral-300">Claim → Execution</span> — did the agent&apos;s summary match what its own recorded tool calls (test runs, command output) actually show happened.</li>
+            </ol>
+            <p>Each hunk resolves through the cheapest tier that can honestly answer it:</p>
+            <div className="space-y-1.5 pl-1">
+              <div><span className="text-neutral-300">deterministic</span> — {TIER_EXPLANATION.deterministic}</div>
+              <div><span className="text-neutral-300">structural</span> — {TIER_EXPLANATION.structural}</div>
+              <div><span className="text-neutral-300">llm</span> — {TIER_EXPLANATION.llm}</div>
+            </div>
+            <p className="text-neutral-600 italic">
+              A passing build only counts as &quot;verified&quot; if the change is also traceable to
+              an instruction or the agent&apos;s own stated plan — compiling and being asked-for
+              are checked as independent facts, not one implying the other.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-3 font-mono text-sm">
         <Badge variant="outline" className={STATUS_BG.contradicted}>
           {counts.contradicted} contradicted
