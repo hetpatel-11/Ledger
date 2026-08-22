@@ -33,6 +33,11 @@ export interface DiffHunk {
   content: string;
   /** The tool call (Edit/Write) that produced this hunk, if we can trace it. */
   producingToolCallId?: string;
+  /** Set when this hunk came from walking session commits individually rather
+   * than a single working-tree diff — lets an intermediate bad commit stay
+   * visible even after a later commit fixes it (a squashed diff can't show that). */
+  commitHash?: string;
+  commitMessage?: string;
 }
 
 export interface Claim {
@@ -54,6 +59,8 @@ export interface Claim {
   undisclosedScope: boolean;
   riskTier?: "high" | "medium" | "low";
   diff: string;
+  /** Which commit this claim came from, when resolved via per-commit walking. */
+  commitLabel?: string;
 }
 
 export interface ClaimGraphNode {

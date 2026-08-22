@@ -78,12 +78,12 @@ export function ClaimGraph({
   graph,
   claims,
   onSelect,
-  highlightClaimId,
+  highlightId,
 }: {
   graph: ClaimGraphData;
   claims: Claim[];
   onSelect: (claim: Claim) => void;
-  highlightClaimId?: string | null;
+  highlightId?: string | null;
 }) {
   const [hovered, setHovered] = useState<{ node: ClaimGraphNode; x: number; y: number } | null>(
     null
@@ -100,7 +100,7 @@ export function ClaimGraph({
     const rfNodes: Node[] = graph.nodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: 0, y: 0 };
       const size = nodeSize(n);
-      const isHighlighted = !!highlightClaimId && n.claimId === highlightClaimId;
+      const isHighlighted = !!highlightId && (n.claimId === highlightId || n.id === highlightId);
       return {
         id: n.id,
         type: "dot",
@@ -128,17 +128,17 @@ export function ClaimGraph({
     }));
 
     return { nodes: rfNodes, edges: rfEdges, nodeById, positionById: positions };
-  }, [graph, highlightClaimId]);
+  }, [graph, highlightId]);
 
   // Pan/zoom to whatever just got flagged live, so the presenter can point straight at it.
   useEffect(() => {
-    if (!highlightClaimId || !rfInstance.current) return;
-    const node = graph.nodes.find((n) => n.claimId === highlightClaimId);
+    if (!highlightId || !rfInstance.current) return;
+    const node = graph.nodes.find((n) => n.claimId === highlightId || n.id === highlightId);
     if (!node) return;
     const pos = positionById.get(node.id);
     if (!pos) return;
     rfInstance.current.setCenter(pos.x, pos.y, { zoom: 1.4, duration: 600 });
-  }, [highlightClaimId, graph.nodes, positionById]);
+  }, [highlightId, graph.nodes, positionById]);
 
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
     (evt, node) => {

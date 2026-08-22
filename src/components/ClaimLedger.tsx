@@ -72,6 +72,11 @@ export function ClaimLedger({
                 </Badge>
                 <span className="text-neutral-500 shrink-0">{c.file}:{c.startLine}</span>
                 <span className="text-neutral-300 truncate flex-1">{c.assertion}</span>
+                {c.commitLabel && (
+                  <span className="text-neutral-600 shrink-0 truncate max-w-[160px]">
+                    · {c.commitLabel}
+                  </span>
+                )}
                 <span className="text-neutral-600 shrink-0">{isOpen ? "▲" : "▼"}</span>
               </button>
 

@@ -7,6 +7,7 @@ export async function GET() {
   let onResult: (r: unknown) => void;
   let onClaim: (r: unknown) => void;
   let onLive: (r: unknown) => void;
+  let onLiveInstruction: (r: unknown) => void;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -20,10 +21,12 @@ export async function GET() {
       onResult = (data) => send("result-updated", data);
       onClaim = (data) => send("claim-updated", data);
       onLive = (data) => send("live-claim", data);
+      onLiveInstruction = (data) => send("live-instruction", data);
 
       bus.on("result-updated", onResult);
       bus.on("claim-updated", onClaim);
       bus.on("live-claim", onLive);
+      bus.on("live-instruction", onLiveInstruction);
 
       const heartbeat = setInterval(() => {
         controller.enqueue(encoder.encode(`: ping\n\n`));
@@ -36,6 +39,7 @@ export async function GET() {
       bus.off("result-updated", onResult);
       bus.off("claim-updated", onClaim);
       bus.off("live-claim", onLive);
+      bus.off("live-instruction", onLiveInstruction);
     },
   });
 

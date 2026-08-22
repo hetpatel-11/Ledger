@@ -15,7 +15,7 @@ export default function Home() {
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [running, setRunning] = useState(false);
   const [selected, setSelected] = useState<Claim | null>(null);
-  const [lastUpdatedClaimId, setLastUpdatedClaimId] = useState<string | null>(null);
+  const [lastUpdatedId, setLastUpdatedId] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Subscribe once for live updates (bootstrap push, hook-driven live-ingest, verify/fix mutations).
@@ -27,12 +27,12 @@ export default function Home() {
         setResult(data);
         return;
       }
-      if (type === "claim-updated" || type === "live-claim") {
+      if (type === "claim-updated" || type === "live-claim" || type === "live-instruction") {
         // The server-side store already has the full updated claims/graph — refetch
         // it rather than trying to hand-patch partial state (score alone isn't enough;
         // the graph and ledger need the new/changed node too).
-        const claimId: string | undefined = data.claim?.id ?? data.claimId;
-        if (claimId) setLastUpdatedClaimId(claimId);
+        const highlightTarget: string | undefined = data.claim?.id ?? data.claimId ?? data.nodeId;
+        if (highlightTarget) setLastUpdatedId(highlightTarget);
         const res = await fetch("/api/claims");
         if (res.ok) setResult(await res.json());
       }
@@ -77,7 +77,7 @@ export default function Home() {
     const data = await res.json();
     if (data.claim) {
       setSelected(data.claim);
-      setLastUpdatedClaimId(data.claim.id);
+      setLastUpdatedId(data.claim.id);
       setResult((prev) =>
         prev
           ? {
@@ -107,7 +107,7 @@ export default function Home() {
     const data = await res.json();
     if (data.claim) {
       setSelected(data.claim);
-      setLastUpdatedClaimId(data.claim.id);
+      setLastUpdatedId(data.claim.id);
       setResult((prev) =>
         prev
           ? {
@@ -160,7 +160,7 @@ export default function Home() {
                   graph={result.graph}
                   claims={result.claims}
                   onSelect={setSelected}
-                  highlightClaimId={lastUpdatedClaimId}
+                  highlightId={lastUpdatedId}
                 />
               </div>
               <div>

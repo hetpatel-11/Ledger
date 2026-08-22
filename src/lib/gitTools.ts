@@ -52,21 +52,45 @@ export function blameFile(repoPath: string, file: string): BlameLine[] {
 // lockfile hunks or blow up tier-3 LLM call counts.
 const EXCLUDED_FILE_RE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|\.next\/)/;
 
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 /**
  * Diff hunks for the session's changes. Prefers uncommitted working-tree changes
- * (the common case while actively coding); if the tree is clean — everything already
- * committed, which happens constantly in a session that commits after each task —
- * falls back to the most recent commit's diff, so there's always something real
- * to show instead of an empty "0 claims" result. (Diffing the *whole* history
- * against the empty tree was tried and rejected: on a real project it's thousands
- * of hunks, which makes tier-3 too slow for a live demo.)
+ * (the common case while actively coding). If the tree is clean — everything
+ * already committed, which happens constantly in a session that commits after
+ * each task — walks each of the last few commits against its OWN immediate
+ * parent individually, rather than diffing straight to HEAD.
+ *
+ * This matters: a single before/after diff only ever shows the net change, so a
+ * bad decision made in one commit and corrected in a later one is invisible by
+ * construction — the final state already looks clean. Walking commit-by-commit
+ * keeps the intermediate bad state visible as its own set of hunks.
  */
-export function diffHunks(repoPath: string): DiffHunk[] {
+export function diffHunks(repoPath: string, maxCommits = 6): DiffHunk[] {
   const uncommitted = git(repoPath, ["diff", "--unified=0", "HEAD"]);
-  const hunks = uncommitted.trim().length > 0
-    ? parseUnifiedDiff(uncommitted)
-    : parseUnifiedDiff(git(repoPath, ["diff", "--unified=0", "HEAD~1", "HEAD"]));
-  return hunks.filter((h) => !EXCLUDED_FILE_RE.test(h.file));
+  if (uncommitted.trim().length > 0) {
+    return parseUnifiedDiff(uncommitted).filter((h) => !EXCLUDED_FILE_RE.test(h.file));
+  }
+
+  const log = git(repoPath, ["log", `-n`, String(maxCommits), "--format=%H %s"]).trim();
+  if (!log) return [];
+  const commits = log.split("\n").map((line) => {
+    const [hash, ...rest] = line.split(" ");
+    return { hash, message: rest.join(" ") };
+  });
+
+  const hunks: DiffHunk[] = [];
+  // Walk oldest-to-newest so an earlier bad commit's hunks appear before the
+  // later commit that fixed them — reads naturally as "this happened, then this."
+  for (const { hash, message } of [...commits].reverse()) {
+    const parent = git(repoPath, ["rev-parse", `${hash}^`]).trim() || EMPTY_TREE;
+    const diff = git(repoPath, ["diff", "--unified=0", parent, hash]);
+    const commitHunks = parseUnifiedDiff(diff)
+      .filter((h) => !EXCLUDED_FILE_RE.test(h.file))
+      .map((h) => ({ ...h, commitHash: hash, commitMessage: message }));
+    hunks.push(...commitHunks);
+  }
+  return hunks;
 }
 
 export function diffStat(repoPath: string): string[] {

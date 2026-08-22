@@ -30,6 +30,14 @@ function basenameOf(file: string): string {
   return file.split("/").pop() ?? file;
 }
 
+/** Disambiguates by commit when hunks came from walking session commits
+ * individually — the same file/line can legitimately appear in more than one
+ * commit (once wrong, once fixed), and each occurrence needs its own claim. */
+function claimId(hunk: DiffHunk): string {
+  const base = `${hunk.file}:${hunk.startLine}`;
+  return hunk.commitHash ? `${base}:${hunk.commitHash.slice(0, 7)}` : base;
+}
+
 /**
  * A turn that's just an image paste (e.g. "[Image: source: ...]") carries no
  * checkable text — using it as "the instruction" makes every judgment meaningless.
@@ -270,7 +278,7 @@ export async function* runPipeline(
       // instruction latitude, so this resolves at tier 1 without needing an LLM opinion.
       tier1Resolved += 1;
       claims.push({
-        id: `${hunk.file}:${hunk.startLine}`,
+        id: claimId(hunk),
         file: hunk.file,
         startLine: hunk.startLine,
         endLine: hunk.endLine,
@@ -284,6 +292,7 @@ export async function* runPipeline(
         undisclosedScope: false,
         riskTier: "low",
         diff: hunk.content,
+        commitLabel: hunk.commitMessage,
       });
       continue;
     }
@@ -293,7 +302,7 @@ export async function* runPipeline(
       // is high-confidence evidence FOR coverage — resolves cheaply, no LLM needed.
       tier2Resolved += 1;
       claims.push({
-        id: `${hunk.file}:${hunk.startLine}`,
+        id: claimId(hunk),
         file: hunk.file,
         startLine: hunk.startLine,
         endLine: hunk.endLine,
@@ -308,6 +317,7 @@ export async function* runPipeline(
         undisclosedScope: false,
         riskTier: "low",
         diff: hunk.content,
+        commitLabel: hunk.commitMessage,
       });
       continue;
     }
@@ -347,7 +357,7 @@ export async function* runPipeline(
       const result = await tier3Check(item.hunk, item.instruction, item.planText, summary, anthropic);
       tier3Resolved += 1;
       claims.push({
-        id: `${item.hunk.file}:${item.hunk.startLine}`,
+        id: claimId(item.hunk),
         file: item.hunk.file,
         startLine: item.hunk.startLine,
         endLine: item.hunk.endLine,
@@ -360,13 +370,14 @@ export async function* runPipeline(
         undisclosedScope: result.undisclosedScope,
         riskTier: result.riskTier,
         diff: item.hunk.content,
+        commitLabel: item.hunk.commitMessage,
       });
     }
   } else {
     // no API key or nothing queued — mark remaining as unchecked without guessing
     for (const item of tier3Queue) {
       claims.push({
-        id: `${item.hunk.file}:${item.hunk.startLine}`,
+        id: claimId(item.hunk),
         file: item.hunk.file,
         startLine: item.hunk.startLine,
         endLine: item.hunk.endLine,

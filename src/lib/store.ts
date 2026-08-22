@@ -10,6 +10,8 @@ declare global {
   var __ifBus: EventEmitter | undefined;
   // eslint-disable-next-line no-var
   var __ifResult: AnalysisResult | null | undefined;
+  // eslint-disable-next-line no-var
+  var __ifCurrentLiveInstruction: string | null | undefined;
 }
 
 export const bus: EventEmitter = globalThis.__ifBus ?? new EventEmitter();
@@ -38,17 +40,40 @@ export function updateClaim(claimId: string, patch: Partial<Claim>) {
   return result.claims[idx];
 }
 
+/**
+ * Called on a UserPromptSubmit hook — a new instruction node, so the *next* live
+ * tool calls have a hub to attach to instead of floating disconnected in the graph.
+ */
+export function appendLiveInstruction(text: string) {
+  const result = getLatestResult();
+  if (!result) return;
+  const nodeId = `instr:live:${Date.now()}`;
+  result.graph.nodes.push({ id: nodeId, kind: "instruction", label: text.slice(0, 60) });
+  globalThis.__ifCurrentLiveInstruction = nodeId;
+  bus.emit("live-instruction", { nodeId });
+}
+
 export function appendLiveClaim(claim: Claim) {
   const result = getLatestResult();
   if (!result) return;
   result.claims.push(claim);
+  const hunkNodeId = `hunk:${claim.id}`;
   result.graph.nodes.push({
-    id: `hunk:${claim.id}`,
+    id: hunkNodeId,
     kind: "hunk",
     label: `${claim.file.split("/").pop()}:${claim.startLine}`,
     claimId: claim.id,
     status: claim.status,
   });
+  const currentInstr = globalThis.__ifCurrentLiveInstruction;
+  if (currentInstr) {
+    result.graph.edges.push({
+      id: `${currentInstr}->${hunkNodeId}`,
+      source: currentInstr,
+      target: hunkNodeId,
+      kind: "produced-by",
+    });
+  }
   result.score = recomputeScore(result.claims);
   bus.emit("live-claim", { claim, score: result.score });
 }
