@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Instruction Fidelity",
+  title: "Ledger",
   description: "Code review for whether the agent did what you actually asked.",
 };
 

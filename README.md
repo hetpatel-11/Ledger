@@ -1,4 +1,4 @@
-# Instruction Fidelity
+# Ledger
 
 Code review checks if the code is good. It doesn't check if the agent
 actually did what you asked. This does.
@@ -37,7 +37,7 @@ the "Suggest Fix" action to work.
 
 ## MCP server
 
-`.mcp.json` registers an `instruction-fidelity` MCP server (`mcp/server.ts`,
+`.mcp.json` registers a `ledger` MCP server (`mcp/server.ts`,
 run via `tsx`) exposing three tools to Claude:
 
 - `push_transcript` — analyzes the current session + repo and pushes the result live to the dashboard.

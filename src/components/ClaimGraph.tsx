@@ -85,7 +85,9 @@ export function ClaimGraph({
   const [hovered, setHovered] = useState<{ node: ClaimGraphNode; x: number; y: number } | null>(
     null
   );
+  const [clicked, setClicked] = useState<ClaimGraphNode | null>(null);
   const claimById = useMemo(() => new Map(claims.map((c) => [c.id, c])), [claims]);
+  const clickedClaim = clicked?.claimId ? claimById.get(clicked.claimId) : undefined;
 
   const { nodes, edges, nodeById } = useMemo(() => {
     const positions = computeLayout(graph.nodes, graph.edges);
@@ -131,10 +133,9 @@ export function ClaimGraph({
   const onNodeClick: NodeMouseHandler = useCallback(
     (_evt, node) => {
       const gn = nodeById.get(node.id);
-      const claim = gn?.claimId ? claimById.get(gn.claimId) : undefined;
-      if (claim) onSelect(claim);
+      if (gn) setClicked(gn);
     },
-    [nodeById, claimById, onSelect]
+    [nodeById]
   );
 
   const counts = {
@@ -158,6 +159,7 @@ export function ClaimGraph({
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
         onNodeClick={onNodeClick}
+        onPaneClick={() => setClicked(null)}
       >
         <Background color="#27272a" gap={22} size={1} />
       </ReactFlow>
@@ -183,26 +185,64 @@ export function ClaimGraph({
           <span className="h-2 w-2 rounded-full" style={{ background: STATUS_COLOR.unchecked }} />
           unchecked
         </span>
-        <span className="text-neutral-600">— click a colored node to inspect</span>
+        <span className="text-neutral-600">— click any node</span>
       </div>
 
-      {hovered && (
+      {hovered && !clicked && (
         <div
-          className="fixed z-50 w-72 rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl pointer-events-none font-mono text-xs"
+          className="fixed z-40 w-72 rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl pointer-events-none font-mono text-xs"
           style={{ left: hovered.x + 16, top: hovered.y + 16 }}
         >
           <div className="px-3 py-2.5 text-neutral-200 leading-relaxed">{hovered.node.label}</div>
           <div className="border-t border-neutral-800 px-3 py-2 flex items-center justify-between text-neutral-500">
             <span className="uppercase tracking-wide">{hovered.node.kind}</span>
             {hovered.node.status && (
-              <span
-                style={{ color: nodeColor(hovered.node) }}
-                className="font-semibold"
-              >
+              <span style={{ color: nodeColor(hovered.node) }} className="font-semibold">
                 {hovered.node.status}
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {clicked && (
+        <div className="absolute top-4 right-4 z-50 w-80 rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl font-mono text-xs">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
+            <span className="uppercase tracking-wide text-neutral-500">{clicked.kind}</span>
+            <button
+              onClick={() => setClicked(null)}
+              className="text-neutral-500 hover:text-neutral-300"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="px-3 py-3 text-neutral-200 leading-relaxed whitespace-pre-wrap">
+            {clickedClaim ? clickedClaim.assertion : clicked.label}
+          </div>
+          {clickedClaim && (
+            <div className="px-3 pb-2 text-neutral-500 space-y-1">
+              <div>
+                status:{" "}
+                <span style={{ color: nodeColor(clicked) }} className="font-semibold">
+                  {clickedClaim.status}
+                </span>{" "}
+                · tier: {clickedClaim.tier}
+              </div>
+            </div>
+          )}
+          {clicked.status === undefined && !clickedClaim && (
+            <div className="px-3 pb-3 text-neutral-500">
+              plain session activity — no claim attached to this node yet.
+            </div>
+          )}
+          {clickedClaim && (
+            <button
+              onClick={() => onSelect(clickedClaim)}
+              className="w-full text-left px-3 py-2 border-t border-neutral-800 text-blue-400 hover:bg-neutral-800"
+            >
+              Open full claim (instruction, evidence, actions) →
+            </button>
+          )}
         </div>
       )}
     </div>

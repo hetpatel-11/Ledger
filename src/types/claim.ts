@@ -79,7 +79,7 @@ export interface ClaimGraph {
 export interface AnalysisResult {
   sessionId: string;
   repoPath: string;
-  score: number; // 0-100, instruction-fidelity score
+  score: number; // 0-100, ledger score
   claims: Claim[];
   graph: ClaimGraph;
   stats: {

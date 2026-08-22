@@ -22,7 +22,7 @@ export function ScoreHeader({
     <Card className="bg-neutral-950 border-neutral-800 p-6 flex items-center justify-between">
       <div>
         <div className="text-xs uppercase tracking-wide text-neutral-500 font-mono">
-          Instruction-Fidelity Score
+          Ledger Score
         </div>
         <div className={`text-5xl font-bold font-mono ${color}`}>
           {score === null ? "—" : `${score}%`}

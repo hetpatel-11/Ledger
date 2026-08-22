@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "instruction-fidelity": {
+    "ledger": {
       "command": "npx",
       "args": ["tsx", "mcp/server.ts"],
       "env": {
-        "INSTRUCTION_FIDELITY_URL": "http://localhost:3000"
+        "LEDGER_URL": "http://localhost:3000"
       }
     }
   }

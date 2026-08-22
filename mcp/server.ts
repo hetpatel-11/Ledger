@@ -6,10 +6,10 @@ import { parseTranscript, resolveLatestTranscript } from "../src/lib/parseTransc
 import { runPipeline } from "../src/lib/claimPipeline.js";
 import { setLatestResult, getLatestResult } from "../src/lib/store.js";
 
-const APP_URL = process.env.INSTRUCTION_FIDELITY_URL ?? "http://localhost:3000";
+const APP_URL = process.env.LEDGER_URL ?? "http://localhost:3000";
 
 const server = new McpServer({
-  name: "instruction-fidelity",
+  name: "ledger",
   version: "0.1.0",
 });
 
@@ -18,7 +18,7 @@ server.registerTool(
   {
     title: "Push current session to the audit tool",
     description:
-      "Analyzes the current (or specified) Claude Code session transcript against the repo's git diff, builds the claim graph, and pushes it live to the Instruction Fidelity dashboard.",
+      "Analyzes the current (or specified) Claude Code session transcript against the repo's git diff, builds the claim graph, and pushes it live to the Ledger dashboard.",
     inputSchema: {
       repoPath: z.string().optional().describe("Path to the git repo being reviewed. Defaults to cwd."),
       cwd: z.string().optional().describe("Project cwd used to locate the transcript file. Defaults to repoPath."),
@@ -52,7 +52,7 @@ server.registerTool(
       content: [
         {
           type: "text" as const,
-          text: `Pushed session ${sessionId} to the audit tool. Instruction-Fidelity Score: ${result.score}%. ${result.claims.length} claims (${result.stats.tier1Resolved} deterministic, ${result.stats.tier2Resolved} structural, ${result.stats.tier3Resolved} LLM-judged).`,
+          text: `Pushed session ${sessionId} to the audit tool. Ledger Score: ${result.score}%. ${result.claims.length} claims (${result.stats.tier1Resolved} deterministic, ${result.stats.tier2Resolved} structural, ${result.stats.tier3Resolved} LLM-judged).`,
         },
       ],
     };

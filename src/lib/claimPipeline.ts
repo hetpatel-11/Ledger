@@ -414,7 +414,7 @@ export async function* runPipeline(
     },
   };
 
-  yield { stage: "done", status: "done", message: `Instruction-Fidelity Score: ${score}%` };
+  yield { stage: "done", status: "done", message: `Ledger Score: ${score}%` };
   return result;
 }
 

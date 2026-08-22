@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScoreHeader } from "@/components/ScoreHeader";
 import { PipelineStepper } from "@/components/PipelineStepper";
-import { BlameCompare } from "@/components/BlameCompare";
 import { ClaimPanel } from "@/components/ClaimPanel";
 import { ClaimLedger } from "@/components/ClaimLedger";
 import { ClaimGraph } from "@/components/ClaimGraph";
@@ -120,7 +119,7 @@ export default function Home() {
     <div className="flex-1 max-w-6xl w-full mx-auto p-8 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Instruction Fidelity</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Ledger</h1>
           <p className="text-sm text-neutral-500 font-mono">
             Code review checks if the code is good. This checks if the agent did what you asked.
           </p>
@@ -145,9 +144,8 @@ export default function Home() {
       {result && (
         <Tabs defaultValue="graph">
           <TabsList className="bg-neutral-900 border border-neutral-800">
-            <TabsTrigger value="graph">Claim Graph</TabsTrigger>
-            <TabsTrigger value="blame">Blame / Diff</TabsTrigger>
-            <TabsTrigger value="ledger">Claim Ledger</TabsTrigger>
+            <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger value="claims">Claims</TabsTrigger>
           </TabsList>
 
           <TabsContent value="graph" className="mt-4">
@@ -165,41 +163,20 @@ export default function Home() {
                   />
                 ) : (
                   <div className="border border-neutral-800 rounded-lg bg-neutral-950 p-6 text-neutral-600 font-mono text-sm">
-                    Click a colored node (an instruction's linked action or evidence) to inspect its claim and take action.
+                    Click a colored node to inspect it. Nodes tied to a claim (green/red/grey) open the full instruction, evidence, and actions.
                   </div>
                 )}
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="blame" className="mt-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <BlameCompare
-                  claims={result.claims}
-                  onSelect={setSelected}
-                  selectedId={selected?.id}
-                />
-              </div>
-              <div>
-                {selected ? (
-                  <ClaimPanel
-                    claim={selected}
-                    onVerify={verifyClaim}
-                    onSuggestFix={suggestFix}
-                    onAcceptFix={acceptFix}
-                  />
-                ) : (
-                  <div className="border border-neutral-800 rounded-lg bg-neutral-950 p-6 text-neutral-600 font-mono text-sm">
-                    Select a line to inspect its claim.
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="ledger" className="mt-4">
-            <ClaimLedger claims={result.claims} onSelect={setSelected} />
+          <TabsContent value="claims" className="mt-4">
+            <ClaimLedger
+              claims={result.claims}
+              onVerify={verifyClaim}
+              onSuggestFix={suggestFix}
+              onAcceptFix={acceptFix}
+            />
           </TabsContent>
         </Tabs>
       )}
