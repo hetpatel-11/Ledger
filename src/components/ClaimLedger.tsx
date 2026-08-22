@@ -89,7 +89,7 @@ export function ClaimLedger({
           {counts.contradicted} contradicted
         </Badge>
         <Badge variant="outline" className={STATUS_BG.unchecked}>
-          {counts.unchecked} unchecked
+          {counts.unchecked} not sure
         </Badge>
         <Badge variant="outline" className={STATUS_BG.verified}>
           {counts.verified} verified

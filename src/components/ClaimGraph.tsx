@@ -206,7 +206,7 @@ export function ClaimGraph({
         </span>
         <span className="flex items-center gap-1.5 text-neutral-300">
           <span className="h-2 w-2 rounded-full" style={{ background: STATUS_COLOR.unchecked }} />
-          unchecked
+          not sure
         </span>
         <span className="text-neutral-600">— click any node</span>
       </div>

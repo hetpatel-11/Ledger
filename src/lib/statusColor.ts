@@ -21,7 +21,7 @@ export const STATUS_DOT: Record<ClaimStatus, string> = {
 export const STATUS_LABEL: Record<ClaimStatus, string> = {
   verified: "Verified",
   contradicted: "Contradicted",
-  unchecked: "Unchecked",
+  unchecked: "Not Sure",
 };
 
 export const ACCENT = "#3b82f6"; // dark blue accent for structural/selection state
